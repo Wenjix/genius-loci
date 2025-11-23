@@ -12,7 +12,7 @@
       "module": "genius_loci.agents.vision_agent",
       "class": "create",
       "description": "Genius Loci Vision agent (OpenAI GPT-5.1 prompt)",
-      "aliases": ["vision", "loci_vision"]
+      "aliases": ["vision"]
     },
     "loci_historian": {
       "module": "genius_loci.agents.historian_agent",
@@ -24,7 +24,7 @@
       "module": "genius_loci.agents.vibe_agent",
       "class": "create",
       "description": "Vibe skill agent (tone and social acceptability)",
-      "aliases": ["vibe", "loci_vibe"]
+      "aliases": ["vibe"]
     },
     "loci_treasurer": {
       "module": "genius_loci.agents.treasurer_agent",
