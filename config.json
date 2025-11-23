@@ -7,6 +7,30 @@
       "description": "Smart info agent using Gemini",
       "llm_provider": "gemini",
       "llm_model": "gemini-2.5-pro"
+    },
+    "loci_vision": {
+      "module": "genius_loci.agents.vision_agent",
+      "class": "create",
+      "description": "Genius Loci Vision agent (OpenAI GPT-5.1 prompt)",
+      "aliases": ["vision", "loci_vision"]
+    },
+    "loci_historian": {
+      "module": "genius_loci.agents.historian_agent",
+      "class": "create",
+      "description": "Historian skill agent (cultural context)",
+      "aliases": ["historian", "loci_hist"]
+    },
+    "loci_vibe": {
+      "module": "genius_loci.agents.vibe_agent",
+      "class": "create",
+      "description": "Vibe skill agent (tone and social acceptability)",
+      "aliases": ["vibe", "loci_vibe"]
+    },
+    "loci_treasurer": {
+      "module": "genius_loci.agents.treasurer_agent",
+      "class": "create",
+      "description": "Treasurer skill agent (policy/risk payout)",
+      "aliases": ["treasurer", "loci_treas"]
     }
   }
 }
