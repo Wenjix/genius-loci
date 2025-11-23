@@ -1,0 +1,12 @@
+{
+  "default_agent": "my_info_agent",
+  "agents": {
+    "my_info_agent": {
+      "module": "examples.agent.basic_spoonos_project.agent",
+      "class": "MyInfoAgent",
+      "description": "Smart info agent using Gemini",
+      "llm_provider": "gemini",
+      "llm_model": "gemini-2.5-pro"
+    }
+  }
+}
