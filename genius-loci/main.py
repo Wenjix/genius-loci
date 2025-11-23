@@ -18,9 +18,10 @@ mock_wallet = MockEVMWallet()
 import google.generativeai as genai
 from spoon_ai.llm.manager import get_llm_manager
 from spoon_ai.schema import Message
+import threading
 from spoon_ai.tools.turnkey_tools import CompleteTransactionWorkflowTool
 
-load_dotenv()
+load_dotenv(dotenv_path=Path(__file__).parent / ".env", override=True)
 
 app = FastAPI()
 
@@ -114,17 +115,39 @@ def _read_prompt(name: str) -> str:
     except Exception:
         return ""
 
-def _llm_chat(system_prompt: str, user_prompt: str) -> str:
-    return ""
+def _llm_chat(provider: str, model: str, system_prompt: str, user_prompt: str) -> str:
+    result = {"content": ""}
+    def runner():
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            manager = get_llm_manager()
+            msgs = [
+                Message(role="system", content=system_prompt),
+                Message(role="user", content=user_prompt),
+            ]
+            resp = loop.run_until_complete(manager.chat(msgs, provider=provider, model=model))
+            result["content"] = resp.content or ""
+            loop.close()
+        except Exception as e:
+            result["content"] = f"LLM error: {e}"
+    t = threading.Thread(target=runner, daemon=True)
+    t.start()
+    t.join(timeout=10.0)
+    return result.get("content", "")
 
 def historian_node(state: LociState) -> LociState:
     v = state.get("vision", "")
-    out = "Context: " + (v or "No description")
+    sys_p = _read_prompt("historian")
+    user_p = f"Image context: {v}\nProvide cultural context and resonance relevant to this photo."
+    out = _llm_chat("gemini", "gemini-2.5-flash", sys_p, user_p)
     return {**state, "historian": out}
 
 def vibe_node(state: LociState) -> LociState:
     v = state.get("vision", "")
-    out = "Assessment generated"
+    sys_p = _read_prompt("vibe")
+    user_p = f"Image context: {v}\nAssess tone and social acceptability in one short paragraph."
+    out = _llm_chat("gemini", "gemini-2.5-flash", sys_p, user_p)
     desc = state.get("vision", "")
     text = desc.lower()
     score = 72
@@ -136,8 +159,6 @@ def vibe_node(state: LociState) -> LociState:
     if ("cinematic lighting" in text) or ("rich texture" in text):
         score = 98
     if ("blurry" in text) or ("bland" in text):
-        score = 35
-    if "invalid image" in text:
         score = 35
     return {**state, "vibe": out, "vibe_score": score}
 
@@ -314,7 +335,7 @@ if __name__ == "__main__":
     run_argue_demo()
 
 @app.post("/api/argue")
-async def api_argue(wallet: str = Form(...), file: UploadFile = File(...)):
+async def api_argue(wallet: str = Form(...), file: UploadFile = File(...), mode: str = Form("skills")):
     uploads = Path(__file__).parent / "static" / "uploads"
     uploads.mkdir(parents=True, exist_ok=True)
     dest = uploads / file.filename
@@ -337,6 +358,7 @@ async def api_argue(wallet: str = Form(...), file: UploadFile = File(...)):
     g = build_argue_graph()
     final = g.run(initial)
     return {
+        "mode_used": mode,
         "vision": final.get("vision", ""),
         "photo_desc": final.get("photo_desc", ""),
         "historian": final.get("historian", ""),

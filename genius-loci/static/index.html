@@ -43,9 +43,23 @@
             position: absolute;
             width: 4000px;
             height: 3000px;
-            background: radial-gradient(circle at 50% 50%, #1a1a2e 0%, #000 100%);
+            background-image: url('assets/googlemap.png');
+            background-size: cover;
             will-change: transform;
             transform-origin: 0 0;
+            position: absolute;
+            overflow: hidden;
+        }
+
+        .world::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 10, 30, 0.85);
+            mix-blend-mode: hard-light;
+            background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 0, 0.05) 3px);
+            pointer-events: none;
+            z-index: 0;
         }
 
         .map-grid {
@@ -72,6 +86,7 @@
             transition: all 0.3s ease;
             box-shadow: 0 0 20px currentColor;
             animation: float 3s infinite ease-in-out;
+            z-index: 1;
         }
 
         .spirit-pin:hover { transform: scale(1.2); z-index: 100; }
@@ -250,9 +265,9 @@
     <div class="map-container">
         <div id="world" class="world">
             <div class="map-grid"></div>
-            <div class="spirit-pin pin-venue" style="top: 1510px; left: 1990px" data-label="VEN: HACKATHON" onclick="openBounty('venue')">👻</div>
-            <div class="spirit-pin pin-ramen" style="top: 1620px; left: 2280px" data-label="FOOD: TOKYO_RAMEN" onclick="openBounty('ramen')">🍜</div>
-            <div class="spirit-pin pin-civic" style="top: 1380px; left: 1720px" data-label="CIVIC: 4TH_STREET" onclick="openBounty('civic')">🚧</div>
+            <div class="spirit-pin pin-venue" data-id="venue" style="top: 1510px; left: 1990px" data-label="VEN: HACKATHON" onclick="openBounty('venue')">👻</div>
+            <div class="spirit-pin pin-ramen" data-id="ramen" style="top: 1620px; left: 2280px" data-label="FOOD: TOKYO_RAMEN" onclick="openBounty('ramen')">🍜</div>
+            <div class="spirit-pin pin-civic" data-id="civic" style="top: 1380px; left: 1720px" data-label="CIVIC: 4TH_STREET" onclick="openBounty('civic')">🚧</div>
         </div>
     </div>
 
@@ -264,6 +279,14 @@
                 <span id="walletText">CONNECT WALLET</span>
             </button>
             <div class="wallet-balance" id="walletBalance">USDC: 0.00</div>
+            <div style="margin-top:6px; display:flex; gap:6px; align-items:center; pointer-events:auto;">
+                <span style="font-size:12px; color:#888;">MODE:</span>
+                <div id="modeToggle" style="display:flex; border:1px solid var(--neon-green);">
+                    <button id="modeSkills" style="background:#0a0a0a; color:var(--neon-green); padding:6px 10px; border:none; cursor:pointer;">Skills</button>
+                    <button id="modeSpoons" style="background:#111; color:#666; padding:6px 10px; border:none; cursor:pointer;">Spoons</button>
+                </div>
+                <button class="wallet-btn" onclick="toggleGodMode()">⚡ GOD MODE: <span id="godState">OFF</span></button>
+            </div>
         </div>
     </div>
 
@@ -299,6 +322,17 @@
         </form>
     </div>
 
+    <div id="createBountyModal" class="bounty-modal">
+        <div style="text-align:right; cursor:pointer;" onclick="closeCreateBounty()">[X]</div>
+        <h2 class="modal-title">CREATE BOUNTY</h2>
+        <div class="modal-bounty">Describe the bounty request for this Spirit.</div>
+        <input id="createBountyInput" type="text" placeholder="Enter bounty request" style="width:100%; padding:10px; background:#111; color:#eee; border:1px solid #333; margin-bottom:10px;">
+        <div style="display:flex; gap:10px;">
+            <button style="background:#111; border:1px solid var(--neon-green); color:var(--neon-green); padding:10px; cursor:pointer;" onclick="confirmCreateBounty()">CONFIRM</button>
+            <button style="background:#111; border:1px solid #666; color:#999; padding:10px; cursor:pointer;" onclick="closeCreateBounty()">CANCEL</button>
+        </div>
+    </div>
+
     <script>
         const container = document.querySelector('.map-container');
         const world = document.getElementById('world');
@@ -320,7 +354,16 @@
             ty = (ch - wh) / 2;
             applyTransform();
         }
+        let godMode = false;
+        function toggleGodMode() {
+            godMode = !godMode;
+            document.getElementById('godState').innerText = godMode ? 'ON' : 'OFF';
+            document.getElementById('godState').style.color = godMode ? 'red' : 'inherit';
+            container.style.cursor = godMode ? 'copy' : 'grab';
+        }
+
         container.addEventListener('mousedown', (e) => {
+            if (godMode) return;
             dragging = true;
             container.style.cursor = 'grabbing';
             sx = e.clientX;
@@ -328,7 +371,7 @@
         });
         window.addEventListener('mouseup', () => {
             dragging = false;
-            container.style.cursor = 'grab';
+            container.style.cursor = godMode ? 'copy' : 'grab';
         });
         window.addEventListener('mousemove', (e) => {
             if (!dragging) return;
@@ -355,7 +398,144 @@
             applyTransform();
         }, { passive: false });
         window.addEventListener('resize', centerWorld);
-        window.addEventListener('DOMContentLoaded', centerWorld);
+        window.addEventListener('DOMContentLoaded', () => { centerWorld(); restorePins(); });
+        world.addEventListener('click', (e) => {
+            if (!godMode || e.target.classList.contains('spirit-pin')) return;
+            const rect = world.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / scale;
+            const y = (e.clientY - rect.top) / scale;
+            createSpiritPin(x, y);
+        });
+
+        function createSpiritPin(x, y) {
+            const pin = document.createElement('div');
+            pin.className = 'spirit-pin';
+            pin.style.left = `${x}px`;
+            pin.style.top = `${y}px`;
+            pin.style.border = '2px solid #fff';
+            pin.innerHTML = '✨';
+            pin.setAttribute('data-label', 'NEW');
+            pin.setAttribute('data-id', `pin-${Date.now()}-${Math.floor(Math.random()*1000000)}`);
+            pin.onclick = () => { openCreateBounty(pin); };
+            world.appendChild(pin);
+            log('SYSTEM', `GENIUS LOCI SPAWNED AT [${Math.floor(x)}, ${Math.floor(y)}]`);
+            savePinPosition(pin);
+        }
+
+        let currentCreatePin = null;
+        function openCreateBounty(pin) {
+            currentCreatePin = pin;
+            const m = document.getElementById('createBountyModal');
+            const input = document.getElementById('createBountyInput');
+            m.style.display = 'block';
+            input.value = '';
+            input.focus();
+        }
+        function closeCreateBounty() {
+            const m = document.getElementById('createBountyModal');
+            m.style.display = 'none';
+            currentCreatePin = null;
+        }
+        function confirmCreateBounty() {
+            const input = document.getElementById('createBountyInput');
+            const bounty = (input.value || '').trim();
+            if (!currentCreatePin) { closeCreateBounty(); return; }
+            if (bounty) {
+                currentCreatePin.style.border = '2px solid #0f0';
+                currentCreatePin.setAttribute('data-label', bounty);
+                log('NETWORK', `NEW NODE ESTABLISHED: ${bounty}`);
+            }
+            closeCreateBounty();
+        }
+
+        let draggingPin = null;
+        let pinStartX = 0;
+        let pinStartY = 0;
+        let mouseStartX = 0;
+        let mouseStartY = 0;
+        let suppressNextClick = false;
+
+        world.addEventListener('mousedown', (e) => {
+            if (!godMode) return;
+            const t = e.target;
+            if (!(t && t.classList && t.classList.contains('spirit-pin'))) return;
+            draggingPin = t;
+            mouseStartX = e.clientX;
+            mouseStartY = e.clientY;
+            pinStartX = parseFloat(draggingPin.style.left) || draggingPin.offsetLeft;
+            pinStartY = parseFloat(draggingPin.style.top) || draggingPin.offsetTop;
+            e.preventDefault();
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!draggingPin) return;
+            const dx = (e.clientX - mouseStartX) / scale;
+            const dy = (e.clientY - mouseStartY) / scale;
+            const nx = pinStartX + dx;
+            const ny = pinStartY + dy;
+            draggingPin.style.left = `${nx}px`;
+            draggingPin.style.top = `${ny}px`;
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (!draggingPin) return;
+            suppressNextClick = true;
+            savePinPosition(draggingPin);
+            draggingPin = null;
+        });
+
+        window.addEventListener('click', (e) => {
+            if (!suppressNextClick) return;
+            e.stopPropagation();
+            e.preventDefault();
+            suppressNextClick = false;
+        }, true);
+
+        const PINS_KEY = 'loci_pins';
+        function getPinsStore() {
+            try { return JSON.parse(localStorage.getItem(PINS_KEY) || '{}'); } catch (e) { return {}; }
+        }
+        function setPinsStore(obj) { localStorage.setItem(PINS_KEY, JSON.stringify(obj)); }
+        function ensurePinId(pin) {
+            let id = pin.getAttribute('data-id');
+            if (!id) { id = `pin-${Date.now()}-${Math.floor(Math.random()*1000000)}`; pin.setAttribute('data-id', id); }
+            return id;
+        }
+        function savePinPosition(pin) {
+            const id = ensurePinId(pin);
+            const x = parseFloat(pin.style.left) || pin.offsetLeft;
+            const y = parseFloat(pin.style.top) || pin.offsetTop;
+            const entry = { x, y, label: pin.getAttribute('data-label') || '', html: pin.innerHTML, border: pin.style.border || '', classes: pin.className };
+            const store = getPinsStore();
+            store[id] = entry;
+            setPinsStore(store);
+        }
+        function restorePins() {
+            const store = getPinsStore();
+            document.querySelectorAll('.spirit-pin').forEach((pin) => {
+                const id = pin.getAttribute('data-id');
+                if (id && store[id]) {
+                    const s = store[id];
+                    pin.style.left = `${s.x}px`;
+                    pin.style.top = `${s.y}px`;
+                    if (s.label) pin.setAttribute('data-label', s.label);
+                    if (s.border) pin.style.border = s.border;
+                }
+            });
+            Object.entries(store).forEach(([id, s]) => {
+                if (!document.querySelector(`.spirit-pin[data-id="${id}"]`)) {
+                    const pin = document.createElement('div');
+                    pin.className = s.classes || 'spirit-pin';
+                    pin.setAttribute('data-id', id);
+                    pin.style.left = `${s.x}px`;
+                    pin.style.top = `${s.y}px`;
+                    pin.style.border = s.border || '2px solid #fff';
+                    pin.innerHTML = s.html || '✨';
+                    pin.onclick = () => { openCreateBounty(pin); };
+                    world.appendChild(pin);
+                }
+            });
+        }
         const spirits = {
             venue: {
                 name: "LOCI: HACKATHON_MAIN_STAGE",
@@ -481,18 +661,20 @@
 
         async function runLiveFlow(file) {
             log("UPLOAD", "Transmitting to Genius Loci...");
-            const formData = new FormData();
-            formData.append('photo', file);
-            formData.append('wallet', "0x71C...9A2F");
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('wallet', "0x71C...9A2F");
+            fd.append('mode', execMode);
             try {
-                const res = await fetch('/upload_bounty', { method: 'POST', body: formData });
+                const res = await fetch('/api/argue', { method: 'POST', body: fd });
                 const data = await res.json();
-                log("GPT-5.1", `Vision: "${data.vision_desc}"`, "log-vision");
+                log("GPT-5.1", `Vision: "${data.vision}"`, "log-vision");
                 setTimeout(() => log("VIBE", `Score: ${data.vibe_score}/100`, "log-vibe"), 1000);
                 setTimeout(() => {
                     if (data.approved) {
                         log("TREASURER", "Consensus Reached. Releasing Funds.", "log-treasurer");
-                        setTimeout(() => { log("BLOCKCHAIN", `TX: ${data.tx_hash} | SENT 1.0 USDC`, "log-tx"); incrementBalance(1.0); }, 1000);
+                        const amt = (data.reward_usdc || 1.0);
+                        setTimeout(() => { log("BLOCKCHAIN", `TX: ${data.tx_hash} | SENT ${amt} USDC`, "log-tx"); incrementBalance(amt); }, 1000);
                     } else {
                         log("TREASURER", "Data Rejected.", "log-red");
                     }
@@ -510,6 +692,36 @@
             consoleDiv.appendChild(line);
             consoleDiv.scrollTop = consoleDiv.scrollHeight;
         }
+
+        let execMode = (localStorage.getItem('loci_mode') || 'skills');
+        function updateModeUI() {
+            const skillsBtn = document.getElementById('modeSkills');
+            const spoonsBtn = document.getElementById('modeSpoons');
+            if (execMode === 'skills') {
+                skillsBtn.style.background = '#0a0a0a';
+                skillsBtn.style.color = 'var(--neon-green)';
+                spoonsBtn.style.background = '#111';
+                spoonsBtn.style.color = '#666';
+            } else {
+                spoonsBtn.style.background = '#0a0a0a';
+                spoonsBtn.style.color = 'var(--neon-green)';
+                skillsBtn.style.background = '#111';
+                skillsBtn.style.color = '#666';
+            }
+        }
+        document.getElementById('modeSkills').addEventListener('click', () => {
+            execMode = 'skills';
+            localStorage.setItem('loci_mode', execMode);
+            updateModeUI();
+            log('SYSTEM', 'Mode set: Skills');
+        });
+        document.getElementById('modeSpoons').addEventListener('click', () => {
+            execMode = 'spoons';
+            localStorage.setItem('loci_mode', execMode);
+            updateModeUI();
+            log('SYSTEM', 'Mode set: Spoons');
+        });
+        updateModeUI();
     </script>
 </body>
 </html>
