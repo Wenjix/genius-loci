@@ -117,6 +117,7 @@
             pointer-events: auto;
         }
 
+        .wallet-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
         .wallet-btn {
             background: rgba(0,0,0,0.8);
             border: 1px solid var(--neon-green);
@@ -134,6 +135,7 @@
         .wallet-btn:hover { background: var(--neon-green); color: black; }
         .wallet-dot { width: 8px; height: 8px; background: #555; border-radius: 50%; }
         .wallet-connected .wallet-dot { background: #0f0; box-shadow: 0 0 5px #0f0; }
+        .wallet-balance { background: rgba(0,0,0,0.6); border: 1px solid #333; color: #ccc; font-size: 12px; padding: 6px 10px; pointer-events: none; }
 
         .console-panel {
             position: absolute;
@@ -256,10 +258,13 @@
 
     <div class="header">
         <div class="logo">GENIUS LOCI <span style="font-size:0.5em; vertical-align:middle; background:var(--neon-green); color:black; padding:2px 4px;">BETA</span></div>
-        <button class="wallet-btn" id="walletBtn" onclick="connectWallet()">
-            <div class="wallet-dot"></div>
-            <span id="walletText">CONNECT WALLET</span>
-        </button>
+        <div class="wallet-wrap">
+            <button class="wallet-btn" id="walletBtn" onclick="connectWallet()">
+                <div class="wallet-dot"></div>
+                <span id="walletText">CONNECT WALLET</span>
+            </button>
+            <div class="wallet-balance" id="walletBalance">USDC: 0.00</div>
+        </div>
     </div>
 
     <div class="console-panel">
@@ -360,13 +365,13 @@
             },
             ramen: {
                 name: "LOCI: ICHIRAKU_RAMEN",
-                bounty: "Verify broth clarity. Reward: 0.5 USDC.",
+                bounty: "Provide a clear photo showing spicy broth and toppings. Reward: 0.5 USDC.",
                 color: "#ffd700",
                 type: "mock_ramen"
             },
             civic: {
                 name: "LOCI: MUNICIPAL_ZONE_4",
-                bounty: "Report infrastructure damage. Reward: 0.8 USDC.",
+                bounty: "Provide a clear photo with visible potholes on streets/roads. Reward: 0.8 USDC.",
                 color: "#00f3ff",
                 type: "mock_civic"
             }
@@ -375,6 +380,13 @@
         let currentSpirit = null;
         let currentSpiritKey = null;
         let walletConnected = false;
+        let usdcBalance = 0;
+        function setBalance(v) {
+            usdcBalance = v;
+            const el = document.getElementById('walletBalance');
+            if (el) el.innerText = `USDC: ${usdcBalance.toFixed(2)}`;
+        }
+        function incrementBalance(v) { setBalance(usdcBalance + v); }
 
         function connectWallet() {
             const btn = document.getElementById('walletBtn');
@@ -385,6 +397,7 @@
                 btn.classList.add('wallet-connected');
                 txt.innerText = "0x71C...9A2F";
                 log("SYSTEM", "Wallet Connected: 0x71C...9A2F");
+                setBalance(0);
             }, 800);
         }
 
@@ -433,16 +446,18 @@
 
         async function runSample(quality) {
             closeModal();
-            const imagePath = `/static/assets/${currentSpiritKey}/${quality}_1.jpg`;
+            const imagePath = `/static/assets/${currentSpiritKey}/${quality}_1.png`;
             showInspectorImage(imagePath);
             log("UPLOAD", `Simulating ${quality} sample upload...`);
             try {
                 const response = await fetch(imagePath);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const blob = await response.blob();
-                const file = new File([blob], `${quality}_1.jpg`, { type: blob.type || 'image/jpeg' });
+                const file = new File([blob], `${quality}_1.png`, { type: blob.type || 'image/png' });
                 await runLiveFlow(file);
             } catch (e) {
                 log("ERROR", `Asset missing: ${imagePath}`, "color:red");
+                return;
             }
         }
 
@@ -453,13 +468,13 @@
                     log("VISION", "Analysis: Rich broth, visible steam, correct toppings.", "log-vision");
                     setTimeout(() => log("VIBE", "Aesthetic Score: 98/100. Immaculate.", "log-vibe"), 800);
                     setTimeout(() => log("TREASURER", "High quality data. Payout Authorized.", "log-treasurer"), 1600);
-                    setTimeout(() => log("BLOCKCHAIN", "TX: 0x88a...b12 | SENT 0.5 USDC", "log-tx"), 2500);
+                    setTimeout(() => { log("BLOCKCHAIN", "TX: 0x88a...b12 | SENT 0.5 USDC", "log-tx"); incrementBalance(0.5); }, 2500);
                 }
                 else if (type === 'mock_civic') {
                     log("VISION", "Analysis: Pothole detected. Depth > 5cm.", "log-vision");
                     setTimeout(() => log("HISTORIAN", "Location matched: 4th St. Priority High.", "log-vibe"), 800);
                     setTimeout(() => log("TREASURER", "Hazard confirmed. Payout Authorized.", "log-treasurer"), 1600);
-                    setTimeout(() => log("BLOCKCHAIN", "TX: 0x99c...d34 | SENT 0.8 USDC", "log-tx"), 2500);
+                    setTimeout(() => { log("BLOCKCHAIN", "TX: 0x99c...d34 | SENT 2.0 USDC", "log-tx"); incrementBalance(2.0); }, 2500);
                 }
             }, 1000);
         }
@@ -477,7 +492,7 @@
                 setTimeout(() => {
                     if (data.approved) {
                         log("TREASURER", "Consensus Reached. Releasing Funds.", "log-treasurer");
-                        setTimeout(() => log("BLOCKCHAIN", `TX: ${data.tx_hash} | SENT 1.0 USDC`, "log-tx"), 1000);
+                        setTimeout(() => { log("BLOCKCHAIN", `TX: ${data.tx_hash} | SENT 1.0 USDC`, "log-tx"); incrementBalance(1.0); }, 1000);
                     } else {
                         log("TREASURER", "Data Rejected.", "log-red");
                     }

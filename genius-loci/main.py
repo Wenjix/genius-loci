@@ -14,6 +14,7 @@ from starlette.responses import RedirectResponse
 from starlette.staticfiles import StaticFiles
 from typing import TypedDict, Callable, Dict, List, Optional
 from spoon.mock_wallet import MockEVMWallet
+mock_wallet = MockEVMWallet()
 import google.generativeai as genai
 from spoon_ai.llm.manager import get_llm_manager
 from spoon_ai.schema import Message
@@ -50,6 +51,7 @@ class LociState(TypedDict):
     payout: str
     payout_approved: bool
     tx_hash: str
+    reward_usdc: float
 
 def _describe_image(image_path: str) -> str:
     try:
@@ -66,6 +68,8 @@ def _describe_image(image_path: str) -> str:
             ext = os.path.splitext(image_path)[1].lower()
             mime = "image/jpeg" if ext in [".jpg", ".jpeg"] else "image/png"
             data = Path(image_path).read_bytes()
+            if not (data.startswith(b"\xff\xd8") or data.startswith(b"\x89PNG\r\n\x1a\n")):
+                return "Invalid image data"
             b64 = base64.b64encode(data).decode("utf-8")
             r = client.responses.create(model="gpt-5.1", input=[{"role":"system","content":[{"type":"input_text","text":system_prompt}]},{"role":"user","content":[{"type":"input_text","text":"Analyze this photo for aesthetics, lighting, and vibes."},{"type":"input_image","image_url":f"data:{mime};base64,{b64}"}]}])
             try:
@@ -84,6 +88,8 @@ def _describe_image(image_path: str) -> str:
         mime = "image/jpeg" if ext in [".jpg", ".jpeg"] else "image/png"
         with open(image_path, "rb") as f:
             data = f.read()
+        if not (data.startswith(b"\xff\xd8") or data.startswith(b"\x89PNG\r\n\x1a\n")):
+            return "Invalid image data"
         resp = model.generate_content([
             "Describe this image. Focus on the people and the setting.",
             {"mime_type": mime, "data": data},
@@ -131,13 +137,24 @@ def vibe_node(state: LociState) -> LociState:
         score = 98
     if ("blurry" in text) or ("bland" in text):
         score = 35
+    if "invalid image" in text:
+        score = 35
     return {**state, "vibe": out, "vibe_score": score}
 
 def treasurer_node(state: LociState) -> LociState:
     score = int(state.get("vibe_score", 0))
     approved = score >= 70
     out = "APPROVE" if approved else "DENY"
-    return {**state, "treasurer": out, "payout_approved": approved}
+    img = state.get("image", "")
+    amt = 1.0
+    low = str(img).lower()
+    if "ramen" in low:
+        amt = 1.5
+    elif "starbucks" in low or "closed" in low:
+        amt = 0.5
+    elif "pothole" in low or "civic" in low:
+        amt = 2.0
+    return {**state, "treasurer": out, "payout_approved": approved, "reward_usdc": amt}
 
 def payout_node(state: LociState) -> LociState:
     if not state.get("payout_approved", False):
@@ -146,8 +163,16 @@ def payout_node(state: LociState) -> LociState:
     sign_with = os.getenv("PAYOUT_SIGN_WITH", "")
     rpc_url = os.getenv("WEB3_RPC_URL", "")
     if not to_addr or not sign_with or not rpc_url:
-        wallet = MockEVMWallet()
-        result = wallet.send_usdc(to_addr, 1.0)
+        amt = float(state.get("reward_usdc", 1.0))
+        if amt == 1.0:
+            low = str(state.get("image", "")).lower()
+            if "ramen" in low:
+                amt = 1.5
+            elif "starbucks" in low or "closed" in low:
+                amt = 0.5
+            elif "pothole" in low or "civic" in low:
+                amt = 2.0
+        result = mock_wallet.send_usdc(to_addr, amt)
         if result.get("success"):
             return {**state, "payout": result["tx_hash"], "tx_hash": result["tx_hash"], "payout_approved": True}
         return {**state, "payout": "Simulated Transaction Hash: SIM-" + os.urandom(4).hex(), "payout_approved": False}
@@ -226,7 +251,11 @@ class StateGraph:
                 ok = s.get("payout_approved", False)
                 status = "PAYMENT RECEIVED" if ok else "PAYMENT NOT SENT"
                 if ok:
-                    print(f"✅ [CONFIRMED] Block #849201. Sent 1.0 USDC.")
+                    try:
+                        amt = float(s.get("reward_usdc", 1.0))
+                    except Exception:
+                        amt = 1.0
+                    print(f"✅ [CONFIRMED] Block #849201. Sent {amt} USDC.")
                 print(f"🔗 PAYOUT: {status} · {value}")
 
         state = initial
@@ -268,6 +297,7 @@ def run_argue_demo() -> LociState:
         "payout_approved": False,
         "vibe_score": 0,
         "tx_hash": "",
+        "reward_usdc": 1.0,
     }
     g = build_argue_graph()
     final = g.run(initial)
@@ -288,11 +318,15 @@ async def api_argue(wallet: str = Form(...), file: UploadFile = File(...)):
         "image": str(dest),
         "wallet": wallet,
         "vision": "",
+        "photo_desc": "",
         "historian": "",
         "vibe": "",
         "treasurer": "",
         "payout": "",
         "payout_approved": False,
+        "vibe_score": 0,
+        "tx_hash": "",
+        "reward_usdc": 1.0,
     }
     g = build_argue_graph()
     final = g.run(initial)
@@ -306,6 +340,7 @@ async def api_argue(wallet: str = Form(...), file: UploadFile = File(...)):
         "payout": final.get("payout", ""),
         "payout_approved": final.get("payout_approved", False),
         "tx_hash": final.get("tx_hash", ""),
+        "reward_usdc": final.get("reward_usdc", 1.0),
     }
 
 @app.post("/upload_bounty")
