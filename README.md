@@ -1,12 +1,14 @@
 # 👻 Genius Loci (The Spirit of Place)
-"The Map is a Lie. We wake it up."
+"The Map is a Lie. We wake it up. Now Locations pay Humans."
 
 Genius Loci is a decentralized operating system for physical locations. It transforms static places into autonomous economic agents that pay humans to keep their digital twins alive.
 
 Using SpoonOS State Graphs and GPT-5.1 Vision, every location spawns a "Spirit" with a crypto wallet and a personality. These Spirits post bounties for sensory data (e.g., "Show me the queue length," "Verify the menu"), verify the results with an AI swarm, and instantly pay users via the x402 protocol.
 
 ## 🎥 The Demo
-(Insert your 2-minute YouTube video link here)
+Watch the 2-minute demo video to see Genius Loci in action:
+
+[![Genius Loci Demo](https://img.youtube.com/vi/U0vmil8YgyE/0.jpg)](https://youtu.be/U0vmil8YgyE)
 
 ## 🧠 The Architecture: "The Inverted Economy"
 Most maps sell user data. We invert the model: Locations pay users.
@@ -18,7 +20,7 @@ Sensor: A human uploads a photo.
 The Swarm (SpoonOS Graph):
 - 👁️ Vision Node (GPT-5.1): Semantically analyzes the scene ("I see a long line").
 - 📜 Historian Node: Verifies context ("This matches the known location").
-- ✨ Vibe Node: Scores quality ("Blurry photo. Rejected.").
+- ✨ Vibe Node: Scores quality and requirements ("Blurry photo. Rejected.").
 - 💰 Treasurer Node: Executes the payout logic.
 
 Settlement: The user receives instant USDC via x402.

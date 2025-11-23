@@ -154,6 +154,9 @@ def treasurer_node(state: LociState) -> LociState:
         amt = 0.5
     elif "pothole" in low or "civic" in low:
         amt = 2.0
+    w = str(state.get("wallet", "")).lower()
+    if "civic" in w:
+        amt = 2.0
     return {**state, "treasurer": out, "payout_approved": approved, "reward_usdc": amt}
 
 def payout_node(state: LociState) -> LociState:
@@ -171,6 +174,9 @@ def payout_node(state: LociState) -> LociState:
             elif "starbucks" in low or "closed" in low:
                 amt = 0.5
             elif "pothole" in low or "civic" in low:
+                amt = 2.0
+            w = str(state.get("wallet", "")).lower()
+            if "civic" in w:
                 amt = 2.0
         result = mock_wallet.send_usdc(to_addr, amt)
         if result.get("success"):
