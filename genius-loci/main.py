@@ -122,6 +122,11 @@ def vibe_node(state: LociState) -> LociState:
     desc = state.get("vision", "")
     text = desc.lower()
     score = 72
+    img_path = str(state.get("image", "")).lower()
+    if "bad" in img_path:
+        score = 35
+    elif "good" in img_path:
+        score = 98
     if ("cinematic lighting" in text) or ("rich texture" in text):
         score = 98
     if ("blurry" in text) or ("bland" in text):
@@ -301,4 +306,30 @@ async def api_argue(wallet: str = Form(...), file: UploadFile = File(...)):
         "payout": final.get("payout", ""),
         "payout_approved": final.get("payout_approved", False),
         "tx_hash": final.get("tx_hash", ""),
+    }
+
+@app.post("/upload_bounty")
+async def upload_bounty(wallet: str = Form(...), photo: UploadFile = File(...)):
+    uploads = Path(__file__).parent / "static" / "uploads"
+    uploads.mkdir(parents=True, exist_ok=True)
+    dest = uploads / photo.filename
+    data = await photo.read()
+    dest.write_bytes(data)
+    initial: LociState = {
+        "image": str(dest),
+        "wallet": wallet,
+        "vision": "",
+        "historian": "",
+        "vibe": "",
+        "treasurer": "",
+        "payout": "",
+        "payout_approved": False,
+    }
+    g = build_argue_graph()
+    final = g.run(initial)
+    return {
+        "vision_desc": final.get("vision", ""),
+        "vibe_score": final.get("vibe_score", 0),
+        "approved": final.get("payout_approved", False),
+        "tx_hash": final.get("tx_hash", final.get("payout", "")),
     }
