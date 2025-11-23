@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Genius Loci</title>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --fg: #e6e6ff;
+      --accent: #39ff14;
+      --accent2: #ff2e88;
+      --muted: #8a8ab3;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: radial-gradient(1200px 600px at 80% -20%, rgba(57,255,20,0.08), transparent),
+                  radial-gradient(800px 400px at -20% 120%, rgba(255,46,136,0.08), transparent),
+                  var(--bg);
+      color: var(--fg);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      display: grid;
+      place-items: center;
+    }
+    .frame {
+      width: min(900px, 92vw);
+      border: 2px solid rgba(57,255,20,0.4);
+      box-shadow: 0 0 24px rgba(57,255,20,0.35), 0 0 64px rgba(255,46,136,0.15) inset;
+      border-radius: 16px;
+      padding: 28px;
+      backdrop-filter: blur(4px);
+      background: linear-gradient(180deg, rgba(255,46,136,0.06), rgba(57,255,20,0.06));
+    }
+    .title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 18px;
+    }
+    .title::before {
+      content: "▰";
+      color: var(--accent2);
+      filter: drop-shadow(0 0 8px var(--accent2));
+    }
+    .sub {
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+    form { display: grid; gap: 16px; }
+    label { font-size: 14px; color: var(--muted); }
+    input[type="text"], input[type="file"] {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid rgba(230,230,255,0.2);
+      background: rgba(10,10,15,0.6);
+      color: var(--fg);
+      border-radius: 10px;
+      outline: none;
+    }
+    input[type="text"]:focus, input[type="file"]:focus {
+      border-color: rgba(57,255,20,0.6);
+      box-shadow: 0 0 12px rgba(57,255,20,0.25);
+    }
+    .row { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    .actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px; }
+    button {
+      padding: 12px 18px;
+      border-radius: 10px;
+      border: 1px solid rgba(57,255,20,0.6);
+      color: var(--bg);
+      background: var(--accent);
+      cursor: pointer;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    button.secondary {
+      background: transparent;
+      color: var(--accent);
+    }
+    .footer {
+      margin-top: 20px;
+      font-size: 13px;
+      color: var(--muted);
+      text-align: right;
+    }
+    .banner {
+      margin-top: 24px;
+      padding: 16px;
+      border-radius: 12px;
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      display: none;
+    }
+    .banner.success {
+      display: block;
+      background: rgba(57,255,20,0.15);
+      border: 2px solid var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 24px rgba(57,255,20,0.35);
+    }
+    .banner.fail {
+      display: block;
+      background: rgba(255,46,136,0.12);
+      border: 2px solid var(--accent2);
+      color: var(--accent2);
+      box-shadow: 0 0 24px rgba(255,46,136,0.35);
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <div class="title">Genius Loci</div>
+    <div class="sub">Upload a photo and enter a wallet. MVP demo scaffold.</div>
+    <form id="loci-form" action="#" method="post" enctype="multipart/form-data" onsubmit="return false;">
+      <div class="row">
+        <div>
+          <label for="wallet">Wallet Address</label>
+          <input id="wallet" name="wallet" type="text" placeholder="0x..." required />
+        </div>
+        <div>
+          <label for="file">Image Upload</label>
+          <input id="file" name="file" type="file" accept="image/*" required />
+        </div>
+      </div>
+      <div class="actions">
+        <button class="secondary" type="reset">Reset</button>
+        <button type="submit">Submit</button>
+      </div>
+    </form>
+    <div id="banner" class="banner">Awaiting result…</div>
+    <div class="footer">Phase 4 projector-ready</div>
+  </div>
+  <script>
+    const form = document.getElementById('loci-form');
+    const banner = document.getElementById('banner');
+    form.addEventListener('submit', async () => {
+      const fd = new FormData();
+      const wallet = document.getElementById('wallet').value.trim();
+      const file = document.getElementById('file').files[0];
+      if (!wallet || !file) return;
+      fd.append('wallet', wallet);
+      fd.append('file', file);
+      banner.className = 'banner';
+      banner.textContent = 'Processing…';
+      try {
+        const res = await fetch('/api/argue', { method: 'POST', body: fd });
+        const json = await res.json();
+        if (json.payout_approved) {
+          banner.className = 'banner success';
+          banner.textContent = 'PAYMENT RECEIVED';
+        } else {
+          banner.className = 'banner fail';
+          banner.textContent = 'PAYMENT NOT SENT';
+        }
+      } catch (e) {
+        banner.className = 'banner fail';
+        banner.textContent = 'ERROR';
+      }
+    });
+  </script>
+</body>
+</html>
